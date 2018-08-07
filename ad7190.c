@@ -1,18 +1,6 @@
 #include "ad7190.h"
 
 
-
-typedef struct
-{
-void (*cs_set)(void);
-void (*cs_clr)(void);
-uint8_t (*read_rdy_bit)(void);
-void (*write_byte)(uint8_t byte);
-uint8_t (*read_byte)(void);
-uint8_t is_registered;
-
-}ad7190_io_driver_t;
-
 static ad7190_io_driver_t *io;
 
 
@@ -23,15 +11,6 @@ if((x)== (void*)0){                  \
 	return -1;                       \
 }                                    \
 }
-
-#ifndef  TRUE              
-#define  TRUE                      (1)
-#endif
-
-
-#ifndef  FALSE              
-#define  FALSE                     (0)
-#endif
 
 typedef struct
 {
@@ -102,108 +81,13 @@ uint8_t full_scale_reg;
 }ad7190_t;
 
 
-#define  RESERVED_VALUE                    0
 
-#define  GENERAL_ENABLE                    1
-#define  GENERAL_DISABLE                   0
-
-/*COMMUNICATION REG*/
-#define  CR_REG_SELECT_COMM                0   
-#define  CR_REG_SELECT_STATUS              0
-#define  CR_REG_SELECT_MODE                1
-#define  CR_REG_SELECT_CONFIG              2
-#define  CR_REG_SELECT_DATA                3
-#define  CR_REG_SELECT_ID                  4
-#define  CR_REG_SELECT_GPOCON              5
-#define  CR_REG_SELECT_OFFSET              6
-#define  CR_REG_SELECT_FULL_SCALE          7
-
-#define  CR_RW_READ                        1
-#define  CR_RW_WRITE                       0
-
-#define  CR_WEN_ENABLE                     0
-#define  CR_WEN_DISABLE                    1
-
-/*状态寄存器*/
-#define  SR_RDY                            0
-#define  SR_RDY_NOT                        1
-
-#define  SR_ERR                            1
-#define  SR_ERR_NO                         0
-
-#define  SR_NOREF_OK                       0
-#define  SR_NOREF_ERR                      1
-
-#define  SR_PARITY_ODD                     1
-#define  SR_PARITY_EVEN                    0
-
-#define  SR_RESERVED3                      0
-
-#define  SR_CHNEL_AIN1_2                   0
-#define  SR_CHNEL_AIN3_4                   1
-#define  SR_CHNEL_TEMPERATURE              2
-#define  SR_CHNEL_AIN2_2                   3
-#define  SR_CHNEL_AIN1_COM                 4
-#define  SR_CHNEL_AIN2_COM                 5
-#define  SR_CHNEL_AIN3_COM                 6
-#define  SR_CHNEL_AIN4_COM                 7
+static ad7190_t ad7190;
 
 
-/*MODE  REG*/
-#define  MR_MODE_CONTINUE                  0
-#define  MR_MODE_SINGLE                    1
-#define  MR_MODE_IDLE                      2
-#define  MR_MODE_PWR_DOWN                  3
-#define  MR_MODE_IZSC                      4
-#define  MR_MODE_IFSC                      5
-#define  MR_MODE_SZSC                      6
-#define  MR_MODE_SFSC                      7
-
-#define  MR_CLK_SELECT_EC_MCLK12           0
-#define  MR_CLK_SELECT_EC_MCLK1            1
-#define  MR_CLK_SELECT_IC492MHZ_NONE       2
-#define  MR_CLK_SELECT_IC492MHZ_MCLK       3
-
-
-#define  MR_FILTER_SYNC3                   1
-#define  MR_FILTER_SYNC4                   0
-
-
-#define  MR_FS_4_7_HZ                      1023     
-#define  MR_FS_7_5_HZ                      640    
-#define  MR_FS_10_HZ                       480   
-#define  MR_FS_50_HZ                       96    
-#define  MR_FS_60_HZ                       80  
-#define  MR_FS_150_HZ                      32    
-#define  MR_FS_300_HZ                      16  
-#define  MR_FS_960_HZ                      5  
-#define  MR_FS_2400_HZ                     2
-#define  MR_FS_4800_HZ                     1
-
-/*CONFIG REG*/
-
-#define  CR_GAIN_1                         0 /*+- 5000mv*/
-#define  CR_GAIN_8                         3 /*+- 625mv*/
-#define  CR_GAIN_16                        4 /*+- 312.5mv*/
-#define  CR_GAIN_32                        5 /*+- 156.2mv*/
-#define  CR_GAIN_64                        6 /*+- 78mv*/
-#define  CR_GAIN_128                       7 /*+- 39.06mv*/
-
-#define  CR_CHNEL_AIN1_2                   0
-#define  CR_CHNEL_AIN3_4                   1
-#define  CR_CHNEL_TEMPERATURE              2
-#define  CR_CHNEL_AIN2_2                   3
-#define  CR_CHNEL_AIN1_COM                 4
-#define  CR_CHNEL_AIN2_COM                 5
-#define  CR_CHNEL_AIN3_COM                 6
-#define  CR_CHNEL_AIN4_COM                 7
-
-#define  CR_REF_SELECT_1P_1N               0
-#define  CR_REF_SELECT_2P_2N               1
-
-
-
-
+static int ad7190_write_result_check(const uint8_t *check,uint8_t cnt);
+static int ad7190_writes(uint8_t *buffer,uint8_t cnt);
+static int ad7190_reads(uint8_t *buffer,uint8_t cnt);
 
 
 
@@ -221,35 +105,240 @@ int ad7190_register_io_driver(ad7190_io_driver_t *io_driver)
 }
 
 
-int ad7190_writes(uint8_t *buffer,uint8_t cnt)
+static int ad7190_writes(uint8_t *buffer,uint8_t cnt)
 {
 uint8_t i;
 
 for(uint8_t i=0;i<cnt;i++){
-io->write_byte(*buffer++);
+io->write_byte(*buffer--);
 }
 
 return 0;
 }
 
 
-int ad7190_config(uint8_t gain,uint8_t rate,uint8_t chn)
+static int ad7190_reads(uint8_t *buffer,uint8_t cnt)
 {
+uint8_t i;
+	
+for(uint8_t i=0;i<cnt;i++){
+*buffer-- =io->read_byte();
+}
+	
+return 0;
 
 }
 
-int ad7190_write_comm_reg(uint8_t reg)
+
+static int ad7190_if_reset()
 {
-if(io->is_registered != TRUE){
-	return -1;
+uint8_t i;
+for(i=0;i<5;i++){
+io->write_byte(0xff);
+}
+return 0;
 }
 
+
+static int ad7190_write_result_check(const uint8_t *check,uint8_t cnt)
+{
+uint8_t reg[3];
+uint8_t i;
+
+if(cnt>3){
+cnt=3;
+}
+
+ad7190.comm_reg.rw=CR_RW_READ;
+
+ad7190_writes(&ad7190.comm_reg,1);
+ad7190_reads(reg+cnt-1,cnt);
+
+for(i=0;i<cnt;i++){
+if(reg[i]!=check[i]){
+return -1;
+}
+}
+
+return 0;
+}
+
+
+int ad7190_internal_zero_scale_calibrate()
+{
+int result;
+ad7190.comm_reg.rw=CR_RW_WRITE;
+ad7190.comm_reg.rs=CR_REG_SELECT_MODE;
+
+ad7190.mode_reg.md = MR_MODE_IZSC;
+
+ad7190_writes(&ad7190.comm_reg,1);
+ad7190_writes(((uint8_t)&ad7190.mode_reg)+2,3);
+
+result =ad7190_write_result_check(&ad7190.mode_reg,3);
+if(result !=0){
+return -1;
+}
+
+return 0;
+
+}
+int ad7190_internal_full_scale_calibrate()
+{
+int result;
+ad7190.comm_reg.rw=CR_RW_WRITE;
+ad7190.comm_reg.rs=CR_REG_SELECT_MODE;
+	
+ad7190.mode_reg.md = MR_MODE_IFSC;
+	
+ad7190_writes(&ad7190.comm_reg,1);
+ad7190_writes(((uint8_t)&ad7190.mode_reg)+2,3);
+
+result =ad7190_write_result_check(&ad7190.mode_reg,3);
+if(result !=0){
+return -1;
+}
+
+return 0;
+}
+
+
+uint8_t ad7190_is_adc_rdy()
+{
+if(io->read_rdy_bit()==SR_RDY){
+	return 1;
+}
+
+return 0;
+}
+
+
+int ad7190_read_id()
+{
+ad7190.comm_reg.rw=CR_RW_READ;
+ad7190.comm_reg.rs=CR_REG_SELECT_ID;
+
+ad7190_writes(&ad7190,1);
+ad7190_reads(&ad7190.id_reg,1);
+return 0;
+}
+
+
+int ad7190_read_conversion_result()
+{
+ad7190.comm_reg.wen=CR_WEN_ENABLE;
+ad7190.comm_reg.rw=CR_RW_READ;
+ad7190.comm_reg.rs=CR_REG_SELECT_DATA;
+
+ad7190_writes(&ad7190,1);
+ad7190_reads((uint8_t*)&ad7190.data_reg+2,3);
+ad7190_reads((uint8_t*)&ad7190.status_reg,1);
+
+return 0;
+}
+
+int ad7190_channel_config(uint8_t chn,uint8_t chop,uint8_t ub,uint8_t gain)
+{
+int result;
+
+
+ad7190.comm_reg.rw=CR_RW_WRITE;
+ad7190.comm_reg.rs=CR_REG_SELECT_CONFIG;
+
+ad7190.con_reg.chop = chop;
+ad7190.con_reg.chn = chn;
+ad7190.con_reg.ub = ub;
+ad7190.con_reg.gain = gain;
+
+
+ad7190_writes(&ad7190.comm_reg,1);
+ad7190_writes((uint8_t*)&ad7190.con_reg+2,3);
+
+result =ad7190_write_result_check(&ad7190.con_reg,3);
+if(result !=0){
+return -1;
+}
+
+return 0;
+}
+
+
+
+
+int ad7190_init()
+{
+int result;
+ad7190.comm_reg.wen=CR_WEN_ENABLE;
+ad7190.comm_reg.rw=CR_RW_WRITE;
+ad7190.comm_reg.rs=CR_REG_SELECT_MODE;
+
+ad7190.con_reg.refsel = CR_REF_SELECT_1P_1N;
+ad7190.con_reg.buff = GENERAL_ENABLE;
+
+
+
+ad7190.mode_reg.clk = MR_CLK_SELECT_EC_MCLK12;
+ad7190.mode_reg.single = GENERAL_DISABLE;
+ad7190.mode_reg.rej60 = GENERAL_DISABLE;
+ad7190.mode_reg.enpar = GENERAL_DISABLE;
+ad7190.mode_reg.dat_sta = GENERAL_ENABLE;
+
+/*cs 一直保持低电平*/
 io->cs_clr();
-io
+ad7190_if_reset();
 
+ad7190_writes(&ad7190.comm_reg,1);
+ad7190_writes(((uint8_t)&ad7190.mode_reg)+2,3);
 
+result =ad7190_write_result_check(&ad7190.mode_reg,3);
+if(result !=0){
+return -1;
+}
+
+return 0;
 
 }
+
+
+
+int ad7190_convert_start(uint8_t mode,uint8_t sinc,uint8_t rate)
+{
+int result;
+ad7190.comm_reg.rw=CR_RW_WRITE;
+ad7190.comm_reg.rs=CR_REG_SELECT_MODE;
+
+if(mode == MR_MODE_CONTINUE){
+ad7190.mode_reg.md = MR_MODE_CONTINUE;
+}else{
+ad7190.mode_reg.md = MR_MODE_SINGLE;
+}
+
+
+ad7190.mode_reg.sinc3 = sinc;
+
+if(ad7190.con_reg.chop == GENERAL_ENABLE){
+if(ad7190.mode_reg.sinc3 == GENERAL_ENABLE){	
+ad7190.mode_reg.fs = MODULATOR_FREQUENCY/64/3/rate;
+}else{
+ad7190.mode_reg.fs = MODULATOR_FREQUENCY/64/4/rate;
+}
+}else{
+ad7190.mode_reg.fs = MODULATOR_FREQUENCY/64/rate;
+}
+
+ad7190_writes(&ad7190.comm_reg,1);
+ad7190_writes(((uint8_t)&ad7190.mode_reg)+2,3);
+
+result =ad7190_write_result_check(&ad7190.mode_reg,3);
+if(result !=0){
+return -1;
+}
+
+return 0;
+
+}
+
+
 
 
 
