@@ -1,20 +1,19 @@
 #ifndef  __AD7190_H__
 #define  __AD7190_H__
-
+#include "stdint.h"
 
 #ifdef   __cplusplus
-#ifndef  AD7190_BEGIN
 #define  AD7190_BEGIN    extern "C" {
 #define  AD7190_END      }
 #else
 #define  AD7190_BEGIN   
 #define  AD7190_END     
 #endif
-#endif
 
 
 
 AD7190_BEGIN
+
 
 
 #define  RESERVED_VALUE                    0
@@ -93,20 +92,23 @@ AD7190_BEGIN
 #define  CR_GAIN_64                        6 /*+- 78mv*/
 #define  CR_GAIN_128                       7 /*+- 39.06mv*/
 
-#define  CR_CHNEL_AIN1_2                   0
-#define  CR_CHNEL_AIN3_4                   1
-#define  CR_CHNEL_TEMPERATURE              2
-#define  CR_CHNEL_AIN2_2                   3
-#define  CR_CHNEL_AIN1_COM                 4
-#define  CR_CHNEL_AIN2_COM                 5
-#define  CR_CHNEL_AIN3_COM                 6
-#define  CR_CHNEL_AIN4_COM                 7
+#define  CR_CHNEL_AIN1_2                   1
+#define  CR_CHNEL_AIN3_4                   2
+#define  CR_CHNEL_TEMPERATURE              4
+#define  CR_CHNEL_AIN2_2                   8
+#define  CR_CHNEL_AIN1_COM                 16
+#define  CR_CHNEL_AIN2_COM                 32
+#define  CR_CHNEL_AIN3_COM                 64
+#define  CR_CHNEL_AIN4_COM                 128
 
 #define  CR_REF_SELECT_1P_1N               0
 #define  CR_REF_SELECT_2P_2N               1
 
 
-#define  MODULATOR_FREQUENCY               (4.92*1000000/16)   
+
+
+
+#define  MODULATOR_FREQUENCY               (4920000/16)   
 
 
 
@@ -123,11 +125,9 @@ typedef struct
 {
 void (*cs_set)(void);
 void (*cs_clr)(void);
-uint8_t (*read_rdy_bit)(void);
 void (*write_byte)(uint8_t byte);
 uint8_t (*read_byte)(void);
 uint8_t is_registered;
-
 }ad7190_io_driver_t;
 
 
@@ -139,9 +139,11 @@ int ad7190_internal_zero_scale_calibrate();
 int ad7190_internal_full_scale_calibrate();
 
 uint8_t ad7190_is_adc_rdy();
-int ad7190_read_conversion_result();
+int ad7190_read_id();
+int ad7190_pwr_down_switch_close(uint8_t bpdsw);
+int ad7190_read_conversion_result(uint32_t *buffer);
 int ad7190_channel_config(uint8_t chn,uint8_t chop,uint8_t ub,uint8_t gain);
-int ad7190_convert_start(uint8_t mode,uint8_t sinc,uint8_t rate);;
+int ad7190_convert_start(uint8_t mode,uint8_t sinc,uint8_t rate);
 
 
 

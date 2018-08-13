@@ -62,8 +62,8 @@ uint32_t chop:1;
 uint32_t reserved24_31:8;
 }con_reg;
 
-uint8_t data_reg;
-uint8_t id_reg;
+uint32_t data_reg;
+uint8_t  id_reg;
 
 struct {
 uint8_t p0dat:1;
@@ -85,7 +85,7 @@ uint8_t full_scale_reg;
 static ad7190_t ad7190;
 
 
-static int ad7190_write_result_check(const uint8_t *check,uint8_t cnt);
+static int ad7190_write_result_check(const uint8_t *check,uint8_t rs,uint8_t cnt);
 static int ad7190_writes(uint8_t *buffer,uint8_t cnt);
 static int ad7190_reads(uint8_t *buffer,uint8_t cnt);
 
@@ -96,12 +96,13 @@ int ad7190_register_io_driver(ad7190_io_driver_t *io_driver)
  ASSERT_NULL_POINTER(io_driver);
  ASSERT_NULL_POINTER(io_driver->cs_clr);
  ASSERT_NULL_POINTER(io_driver->cs_set);
- ASSERT_NULL_POINTER(io_driver->read_rdy_bit);
  ASSERT_NULL_POINTER(io_driver->write_byte);
  ASSERT_NULL_POINTER(io_driver->read_byte);
 
  io=io_driver;
  io->is_registered=TRUE;
+ 
+ return 0;
 }
 
 
@@ -109,7 +110,7 @@ static int ad7190_writes(uint8_t *buffer,uint8_t cnt)
 {
 uint8_t i;
 
-for(uint8_t i=0;i<cnt;i++){
+for(i=0;i<cnt;i++){
 io->write_byte(*buffer--);
 }
 
@@ -121,7 +122,7 @@ static int ad7190_reads(uint8_t *buffer,uint8_t cnt)
 {
 uint8_t i;
 	
-for(uint8_t i=0;i<cnt;i++){
+for(i=0;i<cnt;i++){
 *buffer-- =io->read_byte();
 }
 	
@@ -129,18 +130,22 @@ return 0;
 
 }
 
-
+#define  IF_RESET_TIMEOUT           20000
 static int ad7190_if_reset()
 {
 uint8_t i;
+uint32_t timeout= IF_RESET_TIMEOUT;
 for(i=0;i<5;i++){
 io->write_byte(0xff);
 }
+
+while(timeout-- > 0);
+  
 return 0;
 }
 
 
-static int ad7190_write_result_check(const uint8_t *check,uint8_t cnt)
+static int ad7190_write_result_check(const uint8_t *check,uint8_t rs,uint8_t cnt)
 {
 uint8_t reg[3];
 uint8_t i;
@@ -150,8 +155,9 @@ cnt=3;
 }
 
 ad7190.comm_reg.rw=CR_RW_READ;
+ad7190.comm_reg.rs=rs;
 
-ad7190_writes(&ad7190.comm_reg,1);
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
 ad7190_reads(reg+cnt-1,cnt);
 
 for(i=0;i<cnt;i++){
@@ -172,10 +178,10 @@ ad7190.comm_reg.rs=CR_REG_SELECT_MODE;
 
 ad7190.mode_reg.md = MR_MODE_IZSC;
 
-ad7190_writes(&ad7190.comm_reg,1);
-ad7190_writes(((uint8_t)&ad7190.mode_reg)+2,3);
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
+ad7190_writes(((uint8_t *)&ad7190.mode_reg)+2,3);
 
-result =ad7190_write_result_check(&ad7190.mode_reg,3);
+result =ad7190_write_result_check((uint8_t *)&ad7190.mode_reg,CR_REG_SELECT_MODE,3);
 if(result !=0){
 return -1;
 }
@@ -191,10 +197,10 @@ ad7190.comm_reg.rs=CR_REG_SELECT_MODE;
 	
 ad7190.mode_reg.md = MR_MODE_IFSC;
 	
-ad7190_writes(&ad7190.comm_reg,1);
-ad7190_writes(((uint8_t)&ad7190.mode_reg)+2,3);
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
+ad7190_writes(((uint8_t *)&ad7190.mode_reg)+2,3);
 
-result =ad7190_write_result_check(&ad7190.mode_reg,3);
+result =ad7190_write_result_check((uint8_t *)&ad7190.mode_reg,CR_REG_SELECT_MODE,3);
 if(result !=0){
 return -1;
 }
@@ -203,13 +209,27 @@ return 0;
 }
 
 
-uint8_t ad7190_is_adc_rdy()
+static int ad7190_read_status()
 {
-if(io->read_rdy_bit()==SR_RDY){
-	return 1;
-}
+ad7190.comm_reg.rw=CR_RW_READ;
+ad7190.comm_reg.rs=CR_REG_SELECT_STATUS;
+
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
+ad7190_reads((uint8_t *)&ad7190.status_reg,1); 
 
 return 0;
+}
+
+
+uint8_t ad7190_is_adc_rdy()
+{
+ad7190_read_status();
+
+if(ad7190.status_reg.rdy == SR_RDY){
+return TRUE;
+}
+
+return FALSE;
 }
 
 
@@ -218,22 +238,23 @@ int ad7190_read_id()
 ad7190.comm_reg.rw=CR_RW_READ;
 ad7190.comm_reg.rs=CR_REG_SELECT_ID;
 
-ad7190_writes(&ad7190,1);
-ad7190_reads(&ad7190.id_reg,1);
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
+ad7190_reads((uint8_t *)&ad7190.id_reg,1);
 return 0;
 }
 
 
-int ad7190_read_conversion_result()
+int ad7190_read_conversion_result(uint32_t *buffer)
 {
 ad7190.comm_reg.wen=CR_WEN_ENABLE;
 ad7190.comm_reg.rw=CR_RW_READ;
 ad7190.comm_reg.rs=CR_REG_SELECT_DATA;
 
-ad7190_writes(&ad7190,1);
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
 ad7190_reads((uint8_t*)&ad7190.data_reg+2,3);
 ad7190_reads((uint8_t*)&ad7190.status_reg,1);
 
+*buffer = ad7190.data_reg;
 return 0;
 }
 
@@ -251,10 +272,33 @@ ad7190.con_reg.ub = ub;
 ad7190.con_reg.gain = gain;
 
 
-ad7190_writes(&ad7190.comm_reg,1);
-ad7190_writes((uint8_t*)&ad7190.con_reg+2,3);
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
+ad7190_writes(((uint8_t *)&ad7190.con_reg)+2,3);
 
-result =ad7190_write_result_check(&ad7190.con_reg,3);
+result =ad7190_write_result_check((uint8_t *)&ad7190.con_reg,CR_REG_SELECT_CONFIG,3);
+if(result !=0){
+return -1;
+}
+
+return 0;
+}
+
+int ad7190_pwr_down_switch_close(uint8_t bpdsw)
+{
+int result;
+ad7190.comm_reg.rw=CR_RW_WRITE;
+ad7190.comm_reg.rs=CR_REG_SELECT_GPOCON;  
+
+if(bpdsw == GENERAL_ENABLE){
+ad7190.gpocon_reg.bpdsw = GENERAL_ENABLE;
+}else{
+ad7190.gpocon_reg.bpdsw = GENERAL_DISABLE;
+}
+
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
+ad7190_writes((uint8_t *)&ad7190.gpocon_reg,1);
+
+result =ad7190_write_result_check((uint8_t *)&ad7190.gpocon_reg,CR_REG_SELECT_GPOCON,1);
 if(result !=0){
 return -1;
 }
@@ -263,19 +307,21 @@ return 0;
 }
 
 
-
-
 int ad7190_init()
 {
 int result;
+
+/*cs 一直保持低电平*/
+io->cs_clr();
+
+
 ad7190.comm_reg.wen=CR_WEN_ENABLE;
 ad7190.comm_reg.rw=CR_RW_WRITE;
 ad7190.comm_reg.rs=CR_REG_SELECT_MODE;
 
 ad7190.con_reg.refsel = CR_REF_SELECT_1P_1N;
 ad7190.con_reg.buff = GENERAL_ENABLE;
-
-
+ad7190.con_reg.refdet = GENERAL_ENABLE;
 
 ad7190.mode_reg.clk = MR_CLK_SELECT_EC_MCLK12;
 ad7190.mode_reg.single = GENERAL_DISABLE;
@@ -283,14 +329,12 @@ ad7190.mode_reg.rej60 = GENERAL_DISABLE;
 ad7190.mode_reg.enpar = GENERAL_DISABLE;
 ad7190.mode_reg.dat_sta = GENERAL_ENABLE;
 
-/*cs 一直保持低电平*/
-io->cs_clr();
 ad7190_if_reset();
 
-ad7190_writes(&ad7190.comm_reg,1);
-ad7190_writes(((uint8_t)&ad7190.mode_reg)+2,3);
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
+ad7190_writes(((uint8_t *)&ad7190.mode_reg)+2,3);
 
-result =ad7190_write_result_check(&ad7190.mode_reg,3);
+result =ad7190_write_result_check((uint8_t *)&ad7190.mode_reg,CR_REG_SELECT_MODE,3);
 if(result !=0){
 return -1;
 }
@@ -326,10 +370,10 @@ ad7190.mode_reg.fs = MODULATOR_FREQUENCY/64/4/rate;
 ad7190.mode_reg.fs = MODULATOR_FREQUENCY/64/rate;
 }
 
-ad7190_writes(&ad7190.comm_reg,1);
-ad7190_writes(((uint8_t)&ad7190.mode_reg)+2,3);
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
+ad7190_writes(((uint8_t *)&ad7190.mode_reg)+2,3);
 
-result =ad7190_write_result_check(&ad7190.mode_reg,3);
+result =ad7190_write_result_check((uint8_t *)&ad7190.mode_reg,CR_REG_SELECT_MODE,3);
 if(result !=0){
 return -1;
 }
@@ -337,49 +381,6 @@ return -1;
 return 0;
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
