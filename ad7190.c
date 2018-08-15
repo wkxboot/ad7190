@@ -208,6 +208,43 @@ return -1;
 return 0;
 }
 
+int ad7190_system_zero_scale_calibrate()
+{
+int result;
+ad7190.comm_reg.rw=CR_RW_WRITE;
+ad7190.comm_reg.rs=CR_REG_SELECT_MODE;
+
+ad7190.mode_reg.md = MR_MODE_SZSC;
+
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
+ad7190_writes(((uint8_t *)&ad7190.mode_reg)+2,3);
+
+result =ad7190_write_result_check((uint8_t *)&ad7190.mode_reg,CR_REG_SELECT_MODE,3);
+if(result !=0){
+return -1;
+}
+
+return 0;
+
+}
+int ad7190_system_full_scale_calibrate()
+{
+int result;
+ad7190.comm_reg.rw=CR_RW_WRITE;
+ad7190.comm_reg.rs=CR_REG_SELECT_MODE;
+	
+ad7190.mode_reg.md = MR_MODE_SFSC;
+	
+ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
+ad7190_writes(((uint8_t *)&ad7190.mode_reg)+2,3);
+
+result =ad7190_write_result_check((uint8_t *)&ad7190.mode_reg,CR_REG_SELECT_MODE,3);
+if(result !=0){
+return -1;
+}
+
+return 0;
+}
 
 static int ad7190_read_status()
 {
@@ -325,7 +362,7 @@ ad7190.con_reg.refdet = GENERAL_ENABLE;
 
 ad7190.mode_reg.clk = MR_CLK_SELECT_EC_MCLK12;
 ad7190.mode_reg.single = GENERAL_DISABLE;
-ad7190.mode_reg.rej60 = GENERAL_DISABLE;
+ad7190.mode_reg.rej60 = GENERAL_ENABLE;
 ad7190.mode_reg.enpar = GENERAL_DISABLE;
 ad7190.mode_reg.dat_sta = GENERAL_ENABLE;
 
@@ -345,7 +382,7 @@ return 0;
 
 
 
-int ad7190_convert_start(uint8_t mode,uint8_t sinc,uint8_t rate)
+int ad7190_convert_start(uint8_t mode,uint8_t sinc,uint16_t rate)
 {
 int result;
 ad7190.comm_reg.rw=CR_RW_WRITE;
@@ -362,12 +399,12 @@ ad7190.mode_reg.sinc3 = sinc;
 
 if(ad7190.con_reg.chop == GENERAL_ENABLE){
 if(ad7190.mode_reg.sinc3 == GENERAL_ENABLE){	
-ad7190.mode_reg.fs = MODULATOR_FREQUENCY/64/3/rate;
+ad7190.mode_reg.fs = MODULATOR_FREQUENCY/1024/3/rate;
 }else{
-ad7190.mode_reg.fs = MODULATOR_FREQUENCY/64/4/rate;
+ad7190.mode_reg.fs = MODULATOR_FREQUENCY/1024/4/rate;
 }
 }else{
-ad7190.mode_reg.fs = MODULATOR_FREQUENCY/64/rate;
+ad7190.mode_reg.fs = MODULATOR_FREQUENCY/1024/rate;
 }
 
 ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
