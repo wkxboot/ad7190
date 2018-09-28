@@ -57,7 +57,7 @@ uint32_t burn:1;
 uint32_t chn:8;
 uint32_t reserved16_19:4;
 uint32_t refsel:1;
-uint32_t reserved21_22:4;
+uint32_t reserved21_22:2;
 uint32_t chop:1;
 uint32_t reserved24_31:8;
 }con_reg;
@@ -246,7 +246,7 @@ return -1;
 return 0;
 }
 
-static int ad7190_read_status()
+int ad7190_read_status()
 {
 ad7190.comm_reg.rw=CR_RW_READ;
 ad7190.comm_reg.rs=CR_REG_SELECT_STATUS;
@@ -258,10 +258,23 @@ return 0;
 }
 
 
+uint8_t ad7190_get_channel()
+{
+ return  ad7190.status_reg.chd;
+}
+
+uint8_t ad7190_is_adc_err()
+{
+ if(ad7190.status_reg.noref  == SR_NOREF_ERR || \
+    ad7190.status_reg.err == SR_ERR){ 
+   return TRUE;
+}
+return FALSE;
+}
+
+
 uint8_t ad7190_is_adc_rdy()
 {
-ad7190_read_status();
-
 if(ad7190.status_reg.rdy == SR_RDY){
 return TRUE;
 }
@@ -270,13 +283,14 @@ return FALSE;
 }
 
 
-int ad7190_read_id()
+int ad7190_read_id(uint8_t *id)
 {
 ad7190.comm_reg.rw=CR_RW_READ;
 ad7190.comm_reg.rs=CR_REG_SELECT_ID;
 
 ad7190_writes((uint8_t *)&ad7190.comm_reg,1);
 ad7190_reads((uint8_t *)&ad7190.id_reg,1);
+*id = ad7190.id_reg;
 return 0;
 }
 
@@ -347,7 +361,7 @@ return 0;
 int ad7190_init()
 {
 int result;
-
+io->cs_set();
 /*cs 一直保持低电平*/
 io->cs_clr();
 
@@ -360,7 +374,7 @@ ad7190.con_reg.refsel = CR_REF_SELECT_1P_1N;
 ad7190.con_reg.buff = GENERAL_ENABLE;
 ad7190.con_reg.refdet = GENERAL_ENABLE;
 
-ad7190.mode_reg.clk = MR_CLK_SELECT_EC_MCLK12;
+ad7190.mode_reg.clk = MR_CLK_SELECT_IC492MHZ_NONE;
 ad7190.mode_reg.single = GENERAL_DISABLE;
 ad7190.mode_reg.rej60 = GENERAL_ENABLE;
 ad7190.mode_reg.enpar = GENERAL_DISABLE;
